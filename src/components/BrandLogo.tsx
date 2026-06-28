@@ -24,7 +24,7 @@ export default function BrandLogo({ compact = false }: Props) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    top: -50,
+    top: -20,
   },
   logo: {
     width: SW * 0.80,
