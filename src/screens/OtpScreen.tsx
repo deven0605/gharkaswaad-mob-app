@@ -10,10 +10,17 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { bgSource } from '../theme/assets';
 import { commonStyles, SW } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
+import { AuthStackParamList } from '../navigation/types';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setCredentials } from '../store/authSlice';
+import { useSendOtpMutation, useVerifyOtpMutation } from '../services/authApi';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
 function ClockIcon() {
   return (
@@ -34,11 +41,16 @@ const OTP_LENGTH = 4;
 const RESEND_SECONDS = 30;
 const BOX_SIZE = Math.floor((SW - 80) / 4);
 
-export default function OtpScreen({ navigation, route }: any) {
-  const phone = route?.params?.phone ?? '+91 98765 43210';
+export default function OtpScreen({ navigation, route }: Props) {
+  const phone = route.params.phone;
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
+  const [errorMsg, setErrorMsg] = useState('');
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const dispatch = useAppDispatch();
+  const locationSaved = useAppSelector(s => s.auth.locationSaved);
+  const [sendOtp, { isLoading: isResending }] = useSendOtpMutation();
+  const [verifyOtp, { isLoading }] = useVerifyOtpMutation();
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -62,8 +74,14 @@ export default function OtpScreen({ navigation, route }: any) {
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (seconds > 0) return;
+    const result = await sendOtp({ phone });
+    if ('error' in result) {
+      setErrorMsg('Failed to resend OTP. Please try again.');
+      return;
+    }
+    setErrorMsg('');
     setOtp(Array(OTP_LENGTH).fill(''));
     setSeconds(RESEND_SECONDS);
     inputRefs.current[0]?.focus();
@@ -71,6 +89,25 @@ export default function OtpScreen({ navigation, route }: any) {
 
   const canVerify = otp.every(d => d !== '');
   const timerStr = `00:${String(seconds).padStart(2, '0')}`;
+
+  const handleVerify = async () => {
+    setErrorMsg('');
+    const result = await verifyOtp({ phone, otp: otp.join('') });
+    if ('error' in result) {
+      setErrorMsg('Incorrect OTP. Please try again.');
+      setOtp(Array(OTP_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
+      return;
+    }
+    dispatch(setCredentials(result.data));
+    if (result.data.isNewUser) {
+      navigation.navigate('CompleteProfile');
+    } else if (!locationSaved) {
+      navigation.navigate('LocationPermission');
+    } else {
+      navigation.navigate('Home');
+    }
+  };
 
   return (
     <ImageBackground source={bgSource} style={commonStyles.root} resizeMode="cover">
@@ -118,15 +155,18 @@ export default function OtpScreen({ navigation, route }: any) {
           </Text>
         </View>
 
+        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
         <View style={commonStyles.spacer} />
 
         <View style={styles.bottomSection}>
           <TouchableOpacity
-            style={[styles.verifyBtn, !canVerify && styles.verifyBtnDisabled]}
+            style={[styles.verifyBtn, (!canVerify || isLoading) && styles.verifyBtnDisabled]}
             activeOpacity={0.85}
-            disabled={!canVerify}
+            disabled={!canVerify || isLoading}
+            onPress={handleVerify}
           >
-            <Text style={styles.verifyBtnText}>Verify</Text>
+            <Text style={styles.verifyBtnText}>{isLoading ? 'Verifying…' : 'Verify'}</Text>
           </TouchableOpacity>
 
           <View style={styles.orRow}>
@@ -138,13 +178,13 @@ export default function OtpScreen({ navigation, route }: any) {
           <Text style={styles.resendLabel}>Didn't receive OTP?</Text>
 
           <TouchableOpacity
-            style={[styles.resendBtn, seconds > 0 && styles.resendBtnDisabled]}
-            activeOpacity={seconds > 0 ? 1 : 0.75}
+            style={[styles.resendBtn, (seconds > 0 || isResending) && styles.resendBtnDisabled]}
+            activeOpacity={(seconds > 0 || isResending) ? 1 : 0.75}
             onPress={handleResend}
-            disabled={seconds > 0}
+            disabled={seconds > 0 || isResending}
           >
-            <Text style={[styles.resendBtnText, seconds > 0 && styles.resendBtnTextDisabled]}>
-              {seconds > 0 ? 'Resend (disabled)' : 'Resend OTP'}
+            <Text style={[styles.resendBtnText, (seconds > 0 || isResending) && styles.resendBtnTextDisabled]}>
+              {isResending ? 'Sending…' : seconds > 0 ? 'Resend (disabled)' : 'Resend OTP'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -205,6 +245,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: Colors.dark,
+  },
+
+  errorText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#C0392B',
+    marginTop: 8,
+    marginBottom: -4,
   },
 
   timerRow: {

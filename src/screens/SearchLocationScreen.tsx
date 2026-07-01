@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
+import { AuthStackParamList } from '../navigation/types';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'SearchLocation'>;
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
@@ -105,7 +109,7 @@ const MOCK_SUGGESTIONS: Suggestion[] = [
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
-export default function SearchLocationScreen({ navigation }: any) {
+export default function SearchLocationScreen({ navigation }: Props) {
   const [query, setQuery] = useState('Saket Market');
 
   const suggestions = query.trim()
@@ -114,12 +118,12 @@ export default function SearchLocationScreen({ navigation }: any) {
       )
     : MOCK_SUGGESTIONS;
 
-  const handleBack = () => navigation?.goBack();
+  const handleBack = () => navigation.goBack();
   const handleSelectSuggestion = (item: Suggestion) => {
-    // Navigate to ConfirmLocation with the selected place
+    navigation.navigate('ConfirmLocation', { address: `${item.name}, ${item.subtitle}` });
   };
   const handleChooseOnMap = () => {
-    // Navigate to map picker screen
+    navigation.navigate('ConfirmLocation', {});
   };
 
   return (

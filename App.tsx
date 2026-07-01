@@ -1,17 +1,44 @@
-import SearchLocationScreen from './src/screens/SearchLocationScreen';
-export default SearchLocationScreen;
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { Provider } from 'react-redux';
+import { store } from './src/store';
+import { restoreTokens } from './src/store/authSlice';
+import { loadTokens } from './src/utils/secureStorage';
+import AuthNavigator from './src/navigation/AuthNavigator';
+import { Colors } from './src/theme/colors';
 
-//import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
-//export default LocationPermissionScreen;
+function AppContent() {
+  const [ready, setReady] = useState(false);
 
-//import CompleteProfileScreen from './src/screens/CompleteProfileScreen';
-//export default CompleteProfileScreen;
+  useEffect(() => {
+    loadTokens().then(tokens => {
+      if (tokens) {
+        store.dispatch(restoreTokens(tokens));
+      }
+      setReady(true);
+    });
+  }, []);
 
-//import OtpScreen from './src/screens/OtpScreen';
-//export default OtpScreen;
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FBF0E4' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
-//import LoginScreen from './src/screens/LoginScreen';
-//export default LoginScreen;
+  return (
+    <NavigationContainer>
+      <AuthNavigator />
+    </NavigationContainer>
+  );
+}
 
-//import WelcomeScreen from './src/screens/WelcomeScreen';
-//export default WelcomeScreen;
+export default function App() {
+  return (
+    <Provider store={store}>
+      <AppContent />
+    </Provider>
+  );
+}

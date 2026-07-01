@@ -9,12 +9,16 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { bgSource, foodLeafSource } from '../theme/assets';
 import { commonStyles, SW } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
+import { AuthStackParamList } from '../navigation/types';
 
-export default function WelcomeScreen() {
+type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
+
+export default function WelcomeScreen({ navigation }: Props) {
   return (
     <ImageBackground source={bgSource} style={commonStyles.root} resizeMode="cover">
       <StatusBar style="light" />
@@ -25,11 +29,19 @@ export default function WelcomeScreen() {
         </View>
         <View style={commonStyles.spacer} />
         <View style={styles.buttons}>
-          <TouchableOpacity style={styles.getStartedBtn} activeOpacity={0.82}>
+          <TouchableOpacity
+            style={styles.getStartedBtn}
+            activeOpacity={0.82}
+            onPress={() => navigation.navigate('Login')}
+          >
             <Text style={styles.getStartedBtnText}>Get Started</Text>
           </TouchableOpacity>
           <Text style={styles.alreadyText}>Already have an account?</Text>
-          <TouchableOpacity style={styles.loginBtn} activeOpacity={0.72}>
+          <TouchableOpacity
+            style={styles.loginBtn}
+            activeOpacity={0.72}
+            onPress={() => navigation.navigate('Login')}
+          >
             <Text style={styles.loginBtnText}>Log In</Text>
           </TouchableOpacity>
         </View>

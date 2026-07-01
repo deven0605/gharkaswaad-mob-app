@@ -9,7 +9,13 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
+import { AuthStackParamList } from '../navigation/types';
+import { useAppDispatch } from '../store';
+import { setLocationSaved } from '../store/authSlice';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'ConfirmLocation'>;
 
 function BackArrowIcon() {
   return (
@@ -106,11 +112,15 @@ function DragIllustration() {
   );
 }
 
-export default function ConfirmLocationScreen({ navigation }: any) {
-  const handleBack = () => navigation?.goBack();
-  const handleEdit = () => { /* navigate to manual address entry */ };
-  const handleLocateMe = () => { /* re-centre to device GPS */ };
-  const handleConfirm = () => { /* proceed to next screen */ };
+export default function ConfirmLocationScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
+  const handleBack = () => navigation.goBack();
+  const handleEdit = () => navigation.navigate('SearchLocation');
+  const handleLocateMe = () => { /* re-centre to device GPS — requires expo-location */ };
+  const handleConfirm = () => {
+    dispatch(setLocationSaved());
+    navigation.navigate('Home');
+  };
 
   return (
     <SafeAreaView style={styles.container}>

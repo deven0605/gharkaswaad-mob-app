@@ -11,10 +11,14 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { bgSource } from '../theme/assets';
 import { commonStyles } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
+import { AuthStackParamList } from '../navigation/types';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'LocationPermission'>;
 
 function LocationPinIcon({ size = 22, color = 'white' }: { size?: number; color?: string }) {
   return (
@@ -41,13 +45,13 @@ function ShieldCheckIcon({ size = 16, color = Colors.primary }: { size?: number;
 }
 
 
-export default function LocationPermissionScreen({ navigation }: any) {
+export default function LocationPermissionScreen({ navigation }: Props) {
   const handleUseLocation = () => {
-    // Request device location permission
+    navigation.navigate('ConfirmLocation', {});
   };
 
   const handleEnterManually = () => {
-    // Navigate to manual address entry
+    navigation.navigate('SearchLocation');
   };
 
   return (

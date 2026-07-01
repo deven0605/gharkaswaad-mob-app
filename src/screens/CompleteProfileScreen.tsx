@@ -13,10 +13,15 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle, Ellipse } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { bgSource } from '../theme/assets';
 import { commonStyles, SW } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
+import { AuthStackParamList } from '../navigation/types';
+import { useCreateProfileMutation } from '../services/customerApi';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'CompleteProfile'>;
 
 const AVATAR_SIZE = Math.floor(SW * 0.36);
 
@@ -75,11 +80,17 @@ function AvatarPicker({ onPress }: { onPress?: () => void }) {
   );
 }
 
-export default function CompleteProfileScreen({ navigation }: any) {
+export default function CompleteProfileScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [createProfile, { isLoading, error }] = useCreateProfileMutation();
 
   const canSave = name.trim().length > 0 && email.trim().length > 0;
+
+  const handleSave = async () => {
+    await createProfile({ fullName: name.trim(), email: email.trim() }).unwrap();
+    navigation.navigate('LocationPermission');
+  };
 
   return (
     <ImageBackground source={bgSource} style={commonStyles.root} resizeMode="cover">
@@ -164,11 +175,12 @@ export default function CompleteProfileScreen({ navigation }: any) {
 
             <View style={styles.bottomSection}>
               <TouchableOpacity
-                style={[styles.saveBtn, !canSave && styles.saveBtnOff]}
+                style={[styles.saveBtn, (!canSave || isLoading) && styles.saveBtnOff]}
                 activeOpacity={0.85}
-                disabled={!canSave}
+                disabled={!canSave || isLoading}
+                onPress={handleSave}
               >
-                <Text style={styles.saveBtnText}>Save & Continue</Text>
+                <Text style={styles.saveBtnText}>{isLoading ? 'Saving…' : 'Save & Continue'}</Text>
                 <Text style={styles.saveBtnArrow}>→</Text>
               </TouchableOpacity>
             </View>

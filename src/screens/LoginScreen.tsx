@@ -7,13 +7,21 @@ import {
   ImageBackground,
   SafeAreaView,
   TextInput,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { bgSource } from '../theme/assets';
 import { commonStyles, SW } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
+import { AuthStackParamList } from '../navigation/types';
+import { useAppDispatch } from '../store';
+import { setPhone } from '../store/authSlice';
+import { useSendOtpMutation } from '../services/authApi';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 function ShieldCheckIcon() {
   return (
@@ -33,8 +41,24 @@ function ShieldCheckIcon() {
   );
 }
 
-export default function LoginScreen({ navigation }: any) {
-  const [phone, setPhone] = useState('');
+export default function LoginScreen({ navigation }: Props) {
+  const [phone, setPhoneInput] = useState('');
+  const dispatch = useAppDispatch();
+  const [sendOtp, { isLoading }] = useSendOtpMutation();
+
+  const canSend = phone.trim().length === 10;
+
+  const handleSendOtp = async () => {
+    if (!canSend) return;
+    const fullPhone = `+91${phone.trim()}`;
+    const result = await sendOtp({ phone: fullPhone });
+    if ('error' in result) {
+      Alert.alert('Failed to send OTP', 'Please check your connection and try again.');
+      return;
+    }
+    dispatch(setPhone(fullPhone));
+    navigation.navigate('Otp', { phone: fullPhone });
+  };
 
   return (
     <ImageBackground source={bgSource} style={commonStyles.root} resizeMode="cover">
@@ -73,7 +97,7 @@ export default function LoginScreen({ navigation }: any) {
             keyboardType="phone-pad"
             maxLength={10}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={setPhoneInput}
           />
         </View>
 
@@ -89,8 +113,13 @@ export default function LoginScreen({ navigation }: any) {
 
         {/* Bottom section */}
         <View style={styles.bottomSection}>
-          <TouchableOpacity style={styles.sendOtpBtn} activeOpacity={0.85}>
-            <Text style={styles.sendOtpBtnText}>Send OTP</Text>
+          <TouchableOpacity
+            style={[styles.sendOtpBtn, (!canSend || isLoading) && { opacity: 0.6 }]}
+            activeOpacity={0.85}
+            disabled={!canSend || isLoading}
+            onPress={handleSendOtp}
+          >
+            <Text style={styles.sendOtpBtnText}>{isLoading ? 'Sending…' : 'Send OTP'}</Text>
           </TouchableOpacity>
 
           <View style={styles.orRow}>
