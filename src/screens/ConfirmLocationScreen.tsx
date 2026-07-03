@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import MapView, { Region } from 'react-native-maps';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,6 +15,14 @@ import { Colors } from '../theme/colors';
 import { AuthStackParamList } from '../navigation/types';
 import { useAppDispatch } from '../store';
 import { setLocationSaved } from '../store/authSlice';
+import { DeliveryLocation, useSaveLocationMutation } from '../services/customerApi';
+import {
+  geocodeAddress,
+  getCurrentDeliveryLocation,
+  reverseGeocodeCoords,
+} from '../utils/deviceLocation';
+
+const REGION_DELTA = 0.01;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ConfirmLocation'>;
 
@@ -112,14 +121,128 @@ function DragIllustration() {
   );
 }
 
-export default function ConfirmLocationScreen({ navigation }: Props) {
+export default function ConfirmLocationScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
+  const [saveLocation, { isLoading: isSaving }] = useSaveLocationMutation();
+
+  const [location, setLocation] = useState<DeliveryLocation | null>(
+    route.params?.address && route.params.latitude != null && route.params.longitude != null
+      ? {
+          address: route.params.address,
+          latitude: route.params.latitude,
+          longitude: route.params.longitude,
+        }
+      : null,
+  );
+  const [isLocating, setIsLocating] = useState(!location);
+  const [errorMsg, setErrorMsg] = useState('');
+  const mapRef = useRef<MapView>(null);
+  const lastResolvedCoords = useRef<{ latitude: number; longitude: number } | null>(
+    location ? { latitude: location.latitude, longitude: location.longitude } : null,
+  );
+
+  // Resolve the initial pin position once on mount:
+  // - address selected from search but missing coords → forward-geocode it
+  // - nothing passed in (e.g. "Choose on Map") → fall back to device GPS
+  // Coming from route params with full coords is already handled by initial state above.
+  useEffect(() => {
+    if (location) return;
+    let cancelled = false;
+    setIsLocating(true);
+    setErrorMsg('');
+
+    const paramAddress = route.params?.address;
+    const resolve = paramAddress
+      ? geocodeAddress(paramAddress).then(coords => ({ address: paramAddress, ...coords }))
+      : getCurrentDeliveryLocation();
+
+    resolve
+      .then(result => {
+        if (!cancelled) {
+          setLocation(result);
+          lastResolvedCoords.current = { latitude: result.latitude, longitude: result.longitude };
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setErrorMsg(
+            paramAddress
+              ? 'Could not locate this address. Please try another search.'
+              : 'Could not detect your location. Please search manually.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLocating(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleBack = () => navigation.goBack();
   const handleEdit = () => navigation.navigate('SearchLocation');
-  const handleLocateMe = () => { /* re-centre to device GPS — requires expo-location */ };
-  const handleConfirm = () => {
-    dispatch(setLocationSaved());
-    navigation.navigate('Home');
+
+  const handleLocateMe = async () => {
+    setErrorMsg('');
+    setIsLocating(true);
+    try {
+      const result = await getCurrentDeliveryLocation();
+      setLocation(result);
+      lastResolvedCoords.current = { latitude: result.latitude, longitude: result.longitude };
+      mapRef.current?.animateToRegion(
+        {
+          latitude: result.latitude,
+          longitude: result.longitude,
+          latitudeDelta: REGION_DELTA,
+          longitudeDelta: REGION_DELTA,
+        },
+        500,
+      );
+    } catch {
+      setErrorMsg('Could not detect your location. Please try again.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  // Fires whenever the map settles after the user drags/pans it (also on the
+  // initial programmatic region, which we skip since we already resolved it).
+  const handleRegionChangeComplete = async (region: Region) => {
+    const last = lastResolvedCoords.current;
+    if (
+      last &&
+      Math.abs(region.latitude - last.latitude) < 0.0001 &&
+      Math.abs(region.longitude - last.longitude) < 0.0001
+    ) {
+      return;
+    }
+
+    setErrorMsg('');
+    setIsLocating(true);
+    try {
+      const result = await reverseGeocodeCoords(region.latitude, region.longitude);
+      setLocation(result);
+      lastResolvedCoords.current = { latitude: result.latitude, longitude: result.longitude };
+    } catch {
+      setErrorMsg('Could not detect address for this location.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!location) return;
+    setErrorMsg('');
+    try {
+      await saveLocation(location).unwrap();
+      dispatch(setLocationSaved());
+      navigation.navigate('Home');
+    } catch {
+      setErrorMsg('Could not save your location. Please try again.');
+    }
   };
 
   return (
@@ -137,11 +260,24 @@ export default function ConfirmLocationScreen({ navigation }: Props) {
 
       {/* Map */}
       <View style={styles.mapWrapper}>
-        <Image
-          source={require('../../assets/map_image.png')}
-          style={styles.mapImage}
-          resizeMode="cover"
-        />
+        {location ? (
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: REGION_DELTA,
+              longitudeDelta: REGION_DELTA,
+            }}
+            onRegionChangeComplete={handleRegionChangeComplete}
+            showsUserLocation
+          />
+        ) : (
+          <View style={[styles.map, styles.mapLoading]}>
+            <ActivityIndicator color={Colors.primary} size="large" />
+          </View>
+        )}
 
         {/* Centred pin + ripple */}
         <View style={styles.pinGroup} pointerEvents="none">
@@ -150,8 +286,13 @@ export default function ConfirmLocationScreen({ navigation }: Props) {
         </View>
 
         {/* Locate-me FAB */}
-        <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleLocateMe}>
-          <CrosshairIcon />
+        <TouchableOpacity
+          style={styles.fab}
+          activeOpacity={0.85}
+          onPress={handleLocateMe}
+          disabled={isLocating}
+        >
+          {isLocating ? <ActivityIndicator color={Colors.dark} /> : <CrosshairIcon />}
         </TouchableOpacity>
       </View>
 
@@ -166,13 +307,23 @@ export default function ConfirmLocationScreen({ navigation }: Props) {
         {/* Address + edit */}
         <View style={styles.addressRow}>
           <View style={styles.addressLines}>
-            <Text style={styles.addressMain}>Saket, New Delhi 110017</Text>
-            <Text style={styles.addressCountry}>India</Text>
+            {isLocating && !location ? (
+              <Text style={styles.addressMain}>Detecting your location…</Text>
+            ) : (
+              <>
+                <Text style={styles.addressMain}>{location?.address ?? 'Location unavailable'}</Text>
+                {location?.country ? (
+                  <Text style={styles.addressCountry}>{location.country}</Text>
+                ) : null}
+              </>
+            )}
           </View>
           <TouchableOpacity style={styles.editBtn} onPress={handleEdit} activeOpacity={0.7}>
             <PencilIcon />
           </TouchableOpacity>
         </View>
+
+        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
         <View style={styles.divider} />
 
@@ -189,9 +340,14 @@ export default function ConfirmLocationScreen({ navigation }: Props) {
         </View>
 
         {/* Confirm button */}
-        <TouchableOpacity style={styles.confirmBtn} activeOpacity={0.85} onPress={handleConfirm}>
-          <Text style={styles.confirmText}>Confirm Location</Text>
-          <ArrowRightIcon />
+        <TouchableOpacity
+          style={[styles.confirmBtn, (!location || isSaving) && styles.confirmBtnDisabled]}
+          activeOpacity={0.85}
+          onPress={handleConfirm}
+          disabled={!location || isSaving}
+        >
+          <Text style={styles.confirmText}>{isSaving ? 'Saving…' : 'Confirm Location'}</Text>
+          {isSaving ? <ActivityIndicator color={Colors.white} /> : <ArrowRightIcon />}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -236,9 +392,14 @@ const styles = StyleSheet.create({
   mapWrapper: {
     flex: 1,
   },
-  mapImage: {
+  map: {
     flex: 1,
     width: '100%',
+  },
+  mapLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F4EEE6',
   },
   pinGroup: {
     position: 'absolute',
@@ -324,6 +485,12 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
+  errorText: {
+    fontSize: 13,
+    color: '#C0392B',
+    marginBottom: 14,
+  },
+
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.line,
@@ -372,6 +539,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 6,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.6,
   },
   confirmText: {
     color: '#fff',

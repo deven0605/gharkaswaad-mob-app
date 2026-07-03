@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   TextInput,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { AuthStackParamList } from '../navigation/types';
+import { PlaceSuggestion, useLazySearchLocationQuery } from '../services/customerApi';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SearchLocation'>;
 
@@ -91,36 +93,28 @@ function MapFoldIcon() {
   );
 }
 
-// ── Types & mock data ────────────────────────────────────────────────────────
-
-type Suggestion = {
-  id: string;
-  name: string;
-  subtitle: string;
-};
-
-const MOCK_SUGGESTIONS: Suggestion[] = [
-  { id: '1', name: 'Saket Market', subtitle: 'Saket, New Delhi' },
-  { id: '2', name: 'Saket Metro Station', subtitle: 'Press Enclave, Delhi' },
-  { id: '3', name: 'Saket District Centre', subtitle: 'Saket, New Delhi' },
-  { id: '4', name: 'Select Citywalk Mall', subtitle: 'Saket, New Delhi' },
-  { id: '5', name: 'DLF Place Saket', subtitle: 'Saket, New Delhi' },
-];
-
 // ── Screen ───────────────────────────────────────────────────────────────────
 
-export default function SearchLocationScreen({ navigation }: Props) {
-  const [query, setQuery] = useState('Saket Market');
+const DEBOUNCE_MS = 350;
 
-  const suggestions = query.trim()
-    ? MOCK_SUGGESTIONS.filter(s =>
-        s.name.toLowerCase().includes(query.toLowerCase()),
-      )
-    : MOCK_SUGGESTIONS;
+export default function SearchLocationScreen({ navigation }: Props) {
+  const [query, setQuery] = useState('');
+  const [triggerSearch, { data: suggestions = [], isFetching }] = useLazySearchLocationQuery();
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timer = setTimeout(() => triggerSearch(q), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query, triggerSearch]);
 
   const handleBack = () => navigation.goBack();
-  const handleSelectSuggestion = (item: Suggestion) => {
-    navigation.navigate('ConfirmLocation', { address: `${item.name}, ${item.subtitle}` });
+  const handleSelectSuggestion = (item: PlaceSuggestion) => {
+    navigation.navigate('ConfirmLocation', {
+      address: `${item.name}, ${item.subtitle}`,
+      latitude: item.latitude,
+      longitude: item.longitude,
+    });
   };
   const handleChooseOnMap = () => {
     navigation.navigate('ConfirmLocation', {});
@@ -164,29 +158,35 @@ export default function SearchLocationScreen({ navigation }: Props) {
       {/* Suggestions list */}
       <Text style={styles.sectionLabel}>SUGGESTIONS</Text>
 
-      <FlatList
-        data={suggestions}
-        keyExtractor={item => item.id}
-        style={styles.list}
-        keyboardShouldPersistTaps="handled"
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.suggestionRow}
-            activeOpacity={0.75}
-            onPress={() => handleSelectSuggestion(item)}
-          >
-            <View style={styles.pinCircle}>
-              <MapPinIcon />
-            </View>
-            <View style={styles.suggestionTexts}>
-              <Text style={styles.suggestionName}>{item.name}</Text>
-              <Text style={styles.suggestionSub}>{item.subtitle}</Text>
-            </View>
-            <ChevronRightIcon />
-          </TouchableOpacity>
-        )}
-      />
+      {isFetching ? (
+        <ActivityIndicator style={styles.loader} color={Colors.primary} />
+      ) : query.trim() && suggestions.length === 0 ? (
+        <Text style={styles.emptyText}>No matching places found.</Text>
+      ) : (
+        <FlatList
+          data={suggestions}
+          keyExtractor={item => item.placeId}
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.suggestionRow}
+              activeOpacity={0.75}
+              onPress={() => handleSelectSuggestion(item)}
+            >
+              <View style={styles.pinCircle}>
+                <MapPinIcon />
+              </View>
+              <View style={styles.suggestionTexts}>
+                <Text style={styles.suggestionName}>{item.name}</Text>
+                <Text style={styles.suggestionSub}>{item.subtitle}</Text>
+              </View>
+              <ChevronRightIcon />
+            </TouchableOpacity>
+          )}
+        />
+      )}
 
       {/* Choose on Map button */}
       <View style={styles.bottomArea}>
@@ -272,6 +272,17 @@ const styles = StyleSheet.create({
 
   list: {
     flex: 1,
+    paddingHorizontal: 20,
+  },
+
+  loader: {
+    marginTop: 24,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.muted,
+    textAlign: 'center',
+    marginTop: 24,
     paddingHorizontal: 20,
   },
 

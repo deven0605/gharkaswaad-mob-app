@@ -5,6 +5,6 @@ export type AuthStackParamList = {
   CompleteProfile: undefined;
   LocationPermission: undefined;
   SearchLocation: undefined;
-  ConfirmLocation: { address?: string };
+  ConfirmLocation: { address?: string; latitude?: number; longitude?: number };
   Home: undefined;
 };

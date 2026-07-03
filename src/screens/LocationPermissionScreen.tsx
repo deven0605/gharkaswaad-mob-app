@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
@@ -17,6 +18,7 @@ import { bgSource } from '../theme/assets';
 import { commonStyles } from '../theme/styles';
 import BrandLogo from '../components/BrandLogo';
 import { AuthStackParamList } from '../navigation/types';
+import { getCurrentDeliveryLocation, LocationPermissionDeniedError } from '../utils/deviceLocation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'LocationPermission'>;
 
@@ -46,8 +48,24 @@ function ShieldCheckIcon({ size = 16, color = Colors.primary }: { size?: number;
 
 
 export default function LocationPermissionScreen({ navigation }: Props) {
-  const handleUseLocation = () => {
-    navigation.navigate('ConfirmLocation', {});
+  const [isLocating, setIsLocating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleUseLocation = async () => {
+    setErrorMsg('');
+    setIsLocating(true);
+    try {
+      const { address, latitude, longitude } = await getCurrentDeliveryLocation();
+      navigation.navigate('ConfirmLocation', { address, latitude, longitude });
+    } catch (err) {
+      setErrorMsg(
+        err instanceof LocationPermissionDeniedError
+          ? 'Location permission denied. Please enter your address manually.'
+          : 'Could not detect your location. Please try again.',
+      );
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleEnterManually = () => {
@@ -80,20 +98,30 @@ export default function LocationPermissionScreen({ navigation }: Props) {
             </Text>
           </View>
 
+          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
           <View style={styles.buttons}>
             <TouchableOpacity
-              style={styles.primaryBtn}
+              style={[styles.primaryBtn, isLocating && styles.primaryBtnDisabled]}
               activeOpacity={0.85}
               onPress={handleUseLocation}
+              disabled={isLocating}
             >
-              <LocationPinIcon size={22} color="white" />
-              <Text style={styles.primaryBtnText}>Use My Location</Text>
+              {isLocating ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <LocationPinIcon size={22} color="white" />
+              )}
+              <Text style={styles.primaryBtnText}>
+                {isLocating ? 'Detecting…' : 'Use My Location'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.secondaryBtn}
               activeOpacity={0.85}
               onPress={handleEnterManually}
+              disabled={isLocating}
             >
               <MapFoldIcon size={22} color={Colors.primary} />
               <Text style={styles.secondaryBtnText}>Enter Manually</Text>
@@ -151,6 +179,14 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
+  errorText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#C0392B',
+    marginTop: 14,
+    paddingHorizontal: 32,
+  },
+
   buttons: {
     marginTop: 30,
     paddingHorizontal: 22,
@@ -169,6 +205,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 6,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.7,
   },
   primaryBtnText: {
     color: Colors.white,
