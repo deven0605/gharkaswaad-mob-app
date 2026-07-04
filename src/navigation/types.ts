@@ -8,3 +8,15 @@ export type AuthStackParamList = {
   ConfirmLocation: { address?: string; latitude?: number; longitude?: number };
   Home: undefined;
 };
+
+export type HomeStackParamList = {
+  HomeMain: undefined;
+  SearchResults: { query?: string } | undefined;
+  KitchenDetail: { kitchenId: string };
+};
+
+export type MainTabParamList = {
+  HomeTab: undefined;
+  OrdersTab: undefined;
+  ProfileTab: undefined;
+};

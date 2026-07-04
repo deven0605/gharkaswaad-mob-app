@@ -8,7 +8,7 @@ import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import SearchLocationScreen from '../screens/SearchLocationScreen';
 import ConfirmLocationScreen from '../screens/ConfirmLocationScreen';
-import HomeScreen from '../screens/HomeScreen';
+import MainTabNavigator from './MainTabNavigator';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -22,7 +22,7 @@ export default function AuthNavigator() {
       <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
       <Stack.Screen name="SearchLocation" component={SearchLocationScreen} />
       <Stack.Screen name="ConfirmLocation" component={ConfirmLocationScreen} />
-      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Home" component={MainTabNavigator} />
     </Stack.Navigator>
   );
 }

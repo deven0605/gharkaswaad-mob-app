@@ -1,0 +1,210 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { skipToken } from '@reduxjs/toolkit/query/react';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Colors } from '../theme/colors';
+import { HomeStackParamList } from '../navigation/types';
+import { useGetLocationQuery } from '../services/customerApi';
+import { useGetKitchenDetailsQuery } from '../services/kitchenApi';
+import { BackArrowIcon, ClockIcon, DotIcon, HeartIcon, LeafIcon, StarIcon } from '../components/Icons';
+
+type Props = NativeStackScreenProps<HomeStackParamList, 'KitchenDetail'>;
+
+export default function KitchenDetailScreen({ navigation, route }: Props) {
+  const { kitchenId } = route.params;
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const { data: location } = useGetLocationQuery();
+  const {
+    data: kitchen,
+    isLoading,
+    isError,
+    refetch,
+  } = useGetKitchenDetailsQuery(
+    location ? { id: kitchenId, lat: location.latitude, lng: location.longitude } : skipToken,
+  );
+
+  const handleBack = () => navigation.goBack();
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} activeOpacity={0.7} onPress={handleBack}>
+          <BackArrowIcon />
+        </TouchableOpacity>
+      </View>
+
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} color={Colors.primary} />
+      ) : isError || !kitchen ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.emptyText}>Couldn't load this kitchen.</Text>
+          <TouchableOpacity style={styles.retryBtn} activeOpacity={0.7} onPress={refetch}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {kitchen.imageUrl ? (
+            <Image source={{ uri: kitchen.imageUrl }} style={styles.banner} />
+          ) : (
+            <View style={styles.banner} />
+          )}
+
+          <View style={styles.body}>
+            <View style={styles.titleRow}>
+              <Text style={styles.name}>{kitchen.name}</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsFavorite(prev => !prev)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <HeartIcon filled={isFavorite} color={isFavorite ? Colors.primary : Colors.dark} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.metaRow}>
+              <StarIcon />
+              <Text style={styles.metaText}>
+                {kitchen.rating.toFixed(1)} ({kitchen.reviewCount} reviews)
+              </Text>
+            </View>
+
+            <View style={styles.metaRow}>
+              <ClockIcon />
+              <Text style={styles.metaText}>
+                {kitchen.distanceKm} km · {kitchen.etaMinMinutes}-{kitchen.etaMaxMinutes} min
+              </Text>
+            </View>
+
+            <View style={styles.metaRow}>
+              <DotIcon color={kitchen.isOpen ? '#3F9142' : '#C0392B'} />
+              <Text style={styles.metaText}>{kitchen.isOpen ? 'Open now' : 'Closed'}</Text>
+            </View>
+
+            {kitchen.isVeg ? (
+              <View style={styles.metaRow}>
+                <LeafIcon />
+                <Text style={styles.metaText}>Veg Only</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.divider} />
+
+            <Text style={styles.sectionHeader}>MENU</Text>
+            <Text style={styles.emptyText}>Menu coming soon.</Text>
+          </View>
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loader: {
+    marginTop: 40,
+  },
+  errorBox: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  retryBtn: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  banner: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#E8E0D8',
+  },
+
+  body: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  name: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginRight: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  metaText: {
+    fontSize: 14,
+    color: Colors.muted,
+    fontWeight: '500',
+  },
+
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.line,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+
+  emptyText: {
+    textAlign: 'center',
+    color: Colors.muted,
+    fontSize: 14,
+  },
+});
