@@ -15,14 +15,21 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
 import { useGetLocationQuery } from '../services/customerApi';
-import { useGetKitchenDetailsQuery } from '../services/kitchenApi';
+import { useGetKitchenDetailsQuery, useGetKitchenMenuQuery, MenuSlot } from '../services/kitchenApi';
 import { BackArrowIcon, ClockIcon, DotIcon, HeartIcon, LeafIcon, StarIcon } from '../components/Icons';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'KitchenDetail'>;
 
+type Slot = 'lunch' | 'dinner';
+
+function slotSummary(slot: MenuSlot): string {
+  return `${slot.dal} · ${slot.riceCount} ${slot.riceType} · ${slot.chapatiCount} Roti · ${slot.vegetables.join(', ')}`;
+}
+
 export default function KitchenDetailScreen({ navigation, route }: Props) {
   const { kitchenId } = route.params;
   const [isFavorite, setIsFavorite] = useState(false);
+  const [slot, setSlot] = useState<Slot>('lunch');
 
   const { data: location } = useGetLocationQuery();
   const {
@@ -33,6 +40,11 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
   } = useGetKitchenDetailsQuery(
     location ? { id: kitchenId, lat: location.latitude, lng: location.longitude } : skipToken,
   );
+  const { data: menu, isLoading: isMenuLoading } = useGetKitchenMenuQuery(kitchenId);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayMenu = menu?.days.find(d => d.date === todayStr) ?? menu?.days[0];
+  const slotDetails = todayMenu ? (slot === 'lunch' ? todayMenu.lunch : todayMenu.dinner) : null;
 
   const handleBack = () => navigation.goBack();
 
@@ -104,7 +116,49 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
             <View style={styles.divider} />
 
             <Text style={styles.sectionHeader}>MENU</Text>
-            <Text style={styles.emptyText}>Menu coming soon.</Text>
+
+            {isMenuLoading ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : !menu?.hasActivePlan || menu.mealTypes.length === 0 ? (
+              <Text style={styles.emptyText}>Menu coming soon.</Text>
+            ) : (
+              <>
+                <View style={styles.slotTabs}>
+                  <TouchableOpacity
+                    style={[styles.slotTab, slot === 'lunch' && styles.slotTabActive]}
+                    activeOpacity={0.7}
+                    onPress={() => setSlot('lunch')}
+                  >
+                    <Text style={[styles.slotTabText, slot === 'lunch' && styles.slotTabTextActive]}>LUNCH</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.slotTab, slot === 'dinner' && styles.slotTabActive]}
+                    activeOpacity={0.7}
+                    onPress={() => setSlot('dinner')}
+                  >
+                    <Text style={[styles.slotTabText, slot === 'dinner' && styles.slotTabTextActive]}>DINNER</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {menu.mealTypes.map(mealType => (
+                  <View key={mealType.id} style={styles.thaliCard}>
+                    <View style={styles.thaliThumb} />
+                    <View style={styles.thaliBody}>
+                      <Text style={styles.thaliName}>{mealType.name}</Text>
+                      <Text style={styles.thaliDesc} numberOfLines={2}>
+                        {slotDetails ? slotSummary(slotDetails) : mealType.description}
+                      </Text>
+                      <View style={styles.thaliFooter}>
+                        <Text style={styles.thaliPrice}>₹ {mealType.price}</Text>
+                        <TouchableOpacity style={styles.addBtn} activeOpacity={0.7}>
+                          <Text style={styles.addBtnText}>ADD +</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
         </ScrollView>
       )}
@@ -206,5 +260,83 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Colors.muted,
     fontSize: 14,
+  },
+
+  slotTabs: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  slotTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  slotTabActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  slotTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.muted,
+    letterSpacing: 0.5,
+  },
+  slotTabTextActive: {
+    color: '#fff',
+  },
+
+  thaliCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: Colors.line,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  thaliThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: '#E8E0D8',
+    marginRight: 12,
+  },
+  thaliBody: {
+    flex: 1,
+  },
+  thaliName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+  thaliDesc: {
+    fontSize: 12,
+    color: Colors.muted,
+    marginTop: 4,
+  },
+  thaliFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  thaliPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+  addBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+  },
+  addBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

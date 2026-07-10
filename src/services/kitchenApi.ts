@@ -57,6 +57,34 @@ export interface GetKitchenDetailsParams {
   lng: number;
 }
 
+export interface MealTypeOption {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  icon: string;
+}
+
+export interface MenuSlot {
+  vegetables: string[];
+  chapatiCount: number;
+  riceType: string;
+  riceCount: number;
+  dal: string;
+}
+
+export interface DayMenu {
+  date: string;
+  lunch: MenuSlot;
+  dinner: MenuSlot;
+}
+
+export interface KitchenMenu {
+  hasActivePlan: boolean;
+  mealTypes: MealTypeOption[];
+  days: DayMenu[];
+}
+
 // ── Backend response shapes (vendor-service's KitchenCardResponse / FoodItemResult) ─
 
 interface KitchenCardDto {
@@ -156,6 +184,13 @@ export const kitchenApi = createApi({
       providesTags: (_result, _error, { id }) => [{ type: 'Kitchen' as const, id }],
     }),
 
+    // GET /api/kitchens/{id}/menu (Kitchen Detail menu, S10) — vendor-service's KitchenDiscoveryController
+    getKitchenMenu: builder.query<KitchenMenu, string>({
+      query: kitchenId => `/kitchens/${kitchenId}/menu`,
+      transformResponse: (response: { data: KitchenMenu }) => response.data,
+      providesTags: (_result, _error, kitchenId) => [{ type: 'Kitchen' as const, id: `${kitchenId}-menu` }],
+    }),
+
     // GET /api/search (S09 Search) — FR-3.5/3.6
     searchKitchens: builder.query<SearchResults, SearchKitchensParams>({
       query: ({ q, lat, lng, radiusKm }) => ({
@@ -174,5 +209,6 @@ export const kitchenApi = createApi({
 export const {
   useGetKitchensQuery,
   useGetKitchenDetailsQuery,
+  useGetKitchenMenuQuery,
   useLazySearchKitchensQuery,
 } = kitchenApi;
