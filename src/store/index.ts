@@ -4,17 +4,20 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import authReducer from './authSlice';
 import { authApi } from '../services/authApi';
 import { customerApi } from '../services/customerApi';
+import { kitchenApi } from '../services/kitchenApi';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     [authApi.reducerPath]: authApi.reducer,
     [customerApi.reducerPath]: customerApi.reducer,
+    [kitchenApi.reducerPath]: kitchenApi.reducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware()
       .concat(authApi.middleware)
-      .concat(customerApi.middleware),
+      .concat(customerApi.middleware)
+      .concat(kitchenApi.middleware),
 });
 
 setupListeners(store.dispatch);
