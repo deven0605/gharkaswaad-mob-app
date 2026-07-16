@@ -85,6 +85,19 @@ export interface KitchenMenu {
   days: DayMenu[];
 }
 
+export interface AddOnItem {
+  id: string;
+  name: string;
+  unit: string;
+  price: number;
+}
+
+export interface AddOnCategoryGroup {
+  category: string;
+  label: string;
+  items: AddOnItem[];
+}
+
 // ── Backend response shapes (vendor-service's KitchenCardResponse / FoodItemResult) ─
 
 interface KitchenCardDto {
@@ -203,6 +216,12 @@ export const kitchenApi = createApi({
       }),
     }),
 
+    // GET /api/add-ons (Thali Customize add-ons, S4.3) — meal-plan-service's AddOnController
+    getAddOns: builder.query<AddOnCategoryGroup[], void>({
+      query: () => '/addOns',
+      transformResponse: (response: { data: AddOnCategoryGroup[] }) => response.data,
+    }),
+
   }),
 });
 
@@ -211,4 +230,5 @@ export const {
   useGetKitchenDetailsQuery,
   useGetKitchenMenuQuery,
   useLazySearchKitchensQuery,
+  useGetAddOnsQuery,
 } = kitchenApi;

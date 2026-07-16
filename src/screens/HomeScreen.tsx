@@ -13,6 +13,9 @@ import { skipToken } from '@reduxjs/toolkit/query/react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
+import { useAppDispatch, useAppSelector } from '../store';
+import { toggleFavorite } from '../store/favoritesSlice';
+import { deriveNotifications } from '../utils/notifications';
 import { useGetLocationQuery } from '../services/customerApi';
 import { Kitchen, KitchenSortOption, useGetKitchensQuery } from '../services/kitchenApi';
 import KitchenCard from '../components/KitchenCard';
@@ -41,8 +44,11 @@ const SORT_OPTIONS: { key: KitchenSortOption; label: string }[] = [
 ];
 
 export default function HomeScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
+  const favoriteIds = useAppSelector(state => state.favorites.ids);
+  const orders = useAppSelector(state => state.orders.orders);
+  const notificationCount = deriveNotifications(orders).length;
   const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(new Set());
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [sortIndex, setSortIndex] = useState(0);
 
   const { data: location } = useGetLocationQuery();
@@ -80,16 +86,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   const cycleSort = () => setSortIndex(prev => (prev + 1) % SORT_OPTIONS.length);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const handleToggleFavorite = (id: string) => dispatch(toggleFavorite(id));
 
   const handleOpenSearch = () => navigation.navigate('SearchResults');
+  const handleOpenAddressPicker = () => navigation.navigate('SelectAddress');
+  const handleOpenNotifications = () => navigation.navigate('Notifications');
   const handleOpenKitchen = (kitchen: Kitchen) =>
     navigation.navigate('KitchenDetail', { kitchenId: kitchen.id });
 
@@ -105,18 +106,20 @@ export default function HomeScreen({ navigation }: Props) {
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.locationBtn} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.locationBtn} activeOpacity={0.7} onPress={handleOpenAddressPicker}>
           <MapPinIcon size={20} />
           <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
           <ChevronDownIcon />
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={handleOpenNotifications}>
             <BellIcon />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>3</Text>
-            </View>
+            {notificationCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
           <TouchableOpacity style={styles.avatarBtn} activeOpacity={0.7}>
             <PersonIcon size={20} />
@@ -181,8 +184,8 @@ export default function HomeScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <KitchenCard
             kitchen={item}
-            isFavorite={favorites.has(item.id)}
-            onToggleFavorite={toggleFavorite}
+            isFavorite={favoriteIds.includes(item.id)}
+            onToggleFavorite={handleToggleFavorite}
             onPress={handleOpenKitchen}
           />
         )}

@@ -54,24 +54,30 @@ export interface PlaceSuggestion {
   longitude?: number;
 }
 
+// Mirrors customer-service's Address entity / AddressRequest / AddressResponse exactly
+// (SRS §8 Address data model) — flat structured fields, not a pre-composed string.
+export type AddressLabel = 'HOME' | 'WORK' | 'OTHER';
+
 export interface Address {
   id: string;
-  label?: string;
-  fullAddress: string;
-  latitude: number;
-  longitude: number;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  country?: string;
-  isDefault: boolean;
+  label: AddressLabel;
+  flatNo: string;
+  building?: string;
+  street: string;
+  area: string;
+  landmark?: string;
+  city: string;
+  pinCode: string;
+  lat?: number;
+  lng?: number;
+  defaultAddress: boolean;
 }
 
-export type CreateAddressRequest = Omit<Address, 'id' | 'isDefault'> & {
-  isDefault?: boolean;
+export type CreateAddressRequest = Omit<Address, 'id' | 'defaultAddress'> & {
+  defaultAddress?: boolean;
 };
 
-export type UpdateAddressRequest = Partial<CreateAddressRequest>;
+export type UpdateAddressRequest = CreateAddressRequest;
 
 // ── API slice ────────────────────────────────────────────────────────────────
 
@@ -134,6 +140,7 @@ export const customerApi = createApi({
 
     getAddresses: builder.query<Address[], void>({
       query: () => '/customer/addresses',
+      transformResponse: (response: { data: Address[] }) => response.data,
       providesTags: result =>
         result
           ? [
@@ -149,6 +156,7 @@ export const customerApi = createApi({
         method: 'POST',
         body,
       }),
+      transformResponse: (response: { data: Address }) => response.data,
       invalidatesTags: [{ type: 'Address', id: 'LIST' }],
     }),
 
@@ -158,7 +166,8 @@ export const customerApi = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Address', id }],
+      transformResponse: (response: { data: Address }) => response.data,
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Address', id }, { type: 'Address', id: 'LIST' }],
     }),
 
     deleteAddress: builder.mutation<void, string>({
@@ -166,7 +175,16 @@ export const customerApi = createApi({
         url: `/customer/addresses/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (_result, _error, id) => [{ type: 'Address', id }],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Address', id }, { type: 'Address', id: 'LIST' }],
+    }),
+
+    setDefaultAddress: builder.mutation<Address, string>({
+      query: id => ({
+        url: `/customer/addresses/${id}/default`,
+        method: 'POST',
+      }),
+      transformResponse: (response: { data: Address }) => response.data,
+      invalidatesTags: [{ type: 'Address', id: 'LIST' }],
     }),
 
   }),
@@ -183,4 +201,5 @@ export const {
   useAddAddressMutation,
   useUpdateAddressMutation,
   useDeleteAddressMutation,
+  useSetDefaultAddressMutation,
 } = customerApi;

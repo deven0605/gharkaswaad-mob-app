@@ -14,9 +14,11 @@ import { skipToken } from '@reduxjs/toolkit/query/react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
+import { useAppDispatch, useAppSelector } from '../store';
+import { toggleFavorite } from '../store/favoritesSlice';
 import { useGetLocationQuery } from '../services/customerApi';
 import { useGetKitchenDetailsQuery, useGetKitchenMenuQuery, MenuSlot } from '../services/kitchenApi';
-import { BackArrowIcon, ClockIcon, DotIcon, HeartIcon, LeafIcon, StarIcon } from '../components/Icons';
+import { BackArrowIcon, CartIcon, ClockIcon, DotIcon, HeartIcon, LeafIcon, StarIcon } from '../components/Icons';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'KitchenDetail'>;
 
@@ -28,8 +30,13 @@ function slotSummary(slot: MenuSlot): string {
 
 export default function KitchenDetailScreen({ navigation, route }: Props) {
   const { kitchenId } = route.params;
-  const [isFavorite, setIsFavorite] = useState(false);
+  const dispatch = useAppDispatch();
+  const isFavorite = useAppSelector(state => state.favorites.ids.includes(kitchenId));
   const [slot, setSlot] = useState<Slot>('lunch');
+
+  const cart = useAppSelector(state => state.cart);
+  const cartItemCount =
+    cart.kitchenId === kitchenId ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
 
   const { data: location } = useGetLocationQuery();
   const {
@@ -56,6 +63,20 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
         <TouchableOpacity style={styles.backBtn} activeOpacity={0.7} onPress={handleBack}>
           <BackArrowIcon />
         </TouchableOpacity>
+        <View style={styles.headerSpacer} />
+        <TouchableOpacity
+          style={styles.cartBtn}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Cart')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <CartIcon />
+          {cartItemCount > 0 ? (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -80,7 +101,7 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
               <Text style={styles.name}>{kitchen.name}</Text>
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => setIsFavorite(prev => !prev)}
+                onPress={() => dispatch(toggleFavorite(kitchenId))}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <HeartIcon filled={isFavorite} color={isFavorite ? Colors.primary : Colors.dark} />
@@ -141,7 +162,12 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
                 </View>
 
                 {menu.mealTypes.map(mealType => (
-                  <View key={mealType.id} style={styles.thaliCard}>
+                  <TouchableOpacity
+                    key={mealType.id}
+                    style={styles.thaliCard}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('MenuDetails', { kitchenId, slot })}
+                  >
                     <View style={styles.thaliThumb} />
                     <View style={styles.thaliBody}>
                       <Text style={styles.thaliName}>{mealType.name}</Text>
@@ -150,12 +176,18 @@ export default function KitchenDetailScreen({ navigation, route }: Props) {
                       </Text>
                       <View style={styles.thaliFooter}>
                         <Text style={styles.thaliPrice}>₹ {mealType.price}</Text>
-                        <TouchableOpacity style={styles.addBtn} activeOpacity={0.7}>
+                        <TouchableOpacity
+                          style={styles.addBtn}
+                          activeOpacity={0.7}
+                          onPress={() =>
+                            navigation.navigate('ThaliCustomize', { kitchenId, mealTypeId: mealType.id, slot })
+                          }
+                        >
                           <Text style={styles.addBtnText}>ADD +</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </>
             )}
@@ -184,6 +216,34 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  cartBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  cartBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   loader: {

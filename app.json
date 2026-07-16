@@ -35,7 +35,8 @@
         {
           "androidGoogleMapsApiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
         }
-      ]
+      ],
+      "expo-image"
     ]
   }
 }
