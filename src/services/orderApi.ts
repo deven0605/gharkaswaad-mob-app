@@ -5,8 +5,16 @@ import { PaymentMethodApiCode } from '../config/paymentMethods';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-// order-service's OrderStatus enum (Pending -> Preparing -> Ready -> Dispatched -> Delivered)
-export type OrderStatusCode = 'PENDING' | 'PREPARING' | 'READY' | 'DISPATCHED' | 'DELIVERED';
+// order-service's OrderStatus enum: Pending -> Kitchen Accepted -> Preparing ->
+// Ready -> Dispatched -> Delivered, with Rejected as a terminal branch off Pending.
+export type OrderStatusCode =
+  | 'PENDING'
+  | 'KITCHEN_ACCEPTED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DISPATCHED'
+  | 'DELIVERED'
+  | 'REJECTED';
 
 export interface PlaceOrderDeliveryAddress {
   label: string;
@@ -88,6 +96,16 @@ const toPlacedOrder = (dto: OrderDto): PlacedOrder => ({
   placedAt: dto.placedAt,
 });
 
+// GET /orders/{orderId}/status (order-service's OrderController) — polled by
+// OrderTrackingScreen so the timeline reflects real Vendor/delivery-partner
+// activity instead of only the elapsed-time simulation.
+export interface OrderStatusInfo {
+  orderId: string;
+  status: OrderStatusCode;
+  rejectionReason: string | null;
+  updatedAt: string;
+}
+
 // ── API slice ────────────────────────────────────────────────────────────────
 
 export const orderApi = createApi({
@@ -107,7 +125,16 @@ export const orderApi = createApi({
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
 
+    // GET /orders/{orderId}/status — polled by OrderTrackingScreen (see
+    // pollingInterval on the generated hook) so the customer's timeline
+    // reflects real vendor/delivery-partner activity.
+    getOrderStatus: builder.query<OrderStatusInfo, string>({
+      query: orderId => `/orders/${orderId}/status`,
+      transformResponse: (response: { data: OrderStatusInfo }) => response.data,
+      providesTags: (_result, _error, orderId) => [{ type: 'Order', id: orderId }],
+    }),
+
   }),
 });
 
-export const { usePlaceOrderMutation } = orderApi;
+export const { usePlaceOrderMutation, useGetOrderStatusQuery } = orderApi;

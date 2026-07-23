@@ -49,3 +49,32 @@ export function getActiveStepIndex(elapsedSeconds: number): number {
 export function isOrderActive(placedAt: string, nowMs?: number): boolean {
   return getActiveStepIndex(getElapsedSeconds(placedAt, nowMs)) < DELIVERED_INDEX;
 }
+
+// Maps order-service's real OrderStatusCode (see orderApi.ts) onto an
+// ORDER_STEPS index, so a polled real status can drive the same timeline UI
+// that used to be purely simulated. There's no distinct backend status for
+// "Partner Assigned" — DISPATCHED covers both "assigned" and "out for
+// delivery" — so it maps straight to the outForDelivery step, which also
+// retroactively marks "assigned" done (isDone = index < activeIndex).
+// REJECTED has no timeline position (returns -1); callers should check for
+// it separately and show a rejection state instead of the timeline.
+export function backendStatusToStepIndex(
+  status: 'PENDING' | 'KITCHEN_ACCEPTED' | 'PREPARING' | 'READY' | 'DISPATCHED' | 'DELIVERED' | 'REJECTED',
+): number {
+  switch (status) {
+    case 'PENDING':
+      return ORDER_STEPS.findIndex(s => s.key === 'placed');
+    case 'KITCHEN_ACCEPTED':
+      return ORDER_STEPS.findIndex(s => s.key === 'accepted');
+    case 'PREPARING':
+      return ORDER_STEPS.findIndex(s => s.key === 'preparing');
+    case 'READY':
+      return ORDER_STEPS.findIndex(s => s.key === 'ready');
+    case 'DISPATCHED':
+      return OUT_FOR_DELIVERY_INDEX;
+    case 'DELIVERED':
+      return DELIVERED_INDEX;
+    case 'REJECTED':
+      return -1;
+  }
+}
