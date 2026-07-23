@@ -7,12 +7,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { HomeStackParamList } from '../navigation/types';
 import { useGetLocationQuery } from '../services/customerApi';
+import { useGetOrderStatusQuery } from '../services/orderApi';
 import {
   ORDER_STEPS,
   OUT_FOR_DELIVERY_INDEX,
   DELIVERED_INDEX,
   getElapsedSeconds,
   getActiveStepIndex,
+  backendStatusToStepIndex,
 } from '../utils/orderStatus';
 import { BackArrowIcon, CheckIcon, ChatIcon, PhoneIcon, ScooterIcon, UtensilsIcon } from '../components/Icons';
 
@@ -63,8 +65,17 @@ export default function OrderTrackingScreen({ navigation, route }: Props) {
     return () => clearInterval(interval);
   }, []);
 
+  // Polls order-service's real status (vendor accept/reject, delivery-partner
+  // pickup/delivery OTP) instead of relying solely on the elapsed-time
+  // simulation. Falls back to the simulation if the poll hasn't returned yet
+  // or the request fails — same "degrade gracefully" spirit used elsewhere
+  // in this workspace's best-effort integrations.
+  const { data: orderStatus } = useGetOrderStatusQuery(orderId, { pollingInterval: 10000 });
+
   const elapsed = getElapsedSeconds(placedAt);
-  const activeIndex = getActiveStepIndex(elapsed);
+  const isRejected = orderStatus?.status === 'REJECTED';
+  const activeIndex =
+    orderStatus && !isRejected ? backendStatusToStepIndex(orderStatus.status) : getActiveStepIndex(elapsed);
 
   const transitProgress = Math.min(
     1,
@@ -126,6 +137,15 @@ export default function OrderTrackingScreen({ navigation, route }: Props) {
         <View style={styles.headerBtn} />
       </View>
 
+      {isRejected ? (
+        <View style={styles.rejectedBox}>
+          <Text style={styles.rejectedHeading}>Order Rejected</Text>
+          <Text style={styles.rejectedSub}>
+            {orderStatus?.rejectionReason || 'The kitchen was unable to accept this order.'}
+          </Text>
+        </View>
+      ) : (
+      <>
       <View style={styles.mapBox}>
         <MapView style={styles.map} region={region}>
           <Marker coordinate={kitchenCoord} title={kitchenName} anchor={{ x: 0.5, y: 1 }}>
@@ -223,6 +243,8 @@ export default function OrderTrackingScreen({ navigation, route }: Props) {
           <Text style={styles.actionBtnText}>Chat</Text>
         </TouchableOpacity>
       </View>
+      </>
+      )}
     </SafeAreaView>
   );
 }
@@ -253,6 +275,24 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: Colors.dark,
+  },
+
+  rejectedBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  rejectedHeading: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#B91C1C',
+    marginBottom: 8,
+  },
+  rejectedSub: {
+    fontSize: 14.5,
+    color: Colors.muted,
+    textAlign: 'center',
   },
 
   mapBox: {
