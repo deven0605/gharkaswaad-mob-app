@@ -218,7 +218,7 @@ export const kitchenApi = createApi({
 
     // GET /api/add-ons (Thali Customize add-ons, S4.3) — meal-plan-service's AddOnController
     getAddOns: builder.query<AddOnCategoryGroup[], void>({
-      query: () => '/addOns',
+      query: () => '/add-ons',
       transformResponse: (response: { data: AddOnCategoryGroup[] }) => response.data,
     }),
 

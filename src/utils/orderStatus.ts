@@ -1,3 +1,7 @@
+import { createLogger } from './logger';
+
+const log = createLogger('src/utils/orderStatus.ts');
+
 export type OrderStatusKey =
   | 'placed'
   | 'accepted'
@@ -39,15 +43,30 @@ export function getElapsedSeconds(placedAt: string, nowMs: number = Date.now()):
 }
 
 export function getActiveStepIndex(elapsedSeconds: number): number {
-  let idx = 0;
-  ORDER_STEPS.forEach((step, i) => {
-    if (elapsedSeconds >= step.atSeconds) idx = i;
-  });
-  return idx;
+  log.info('getActiveStepIndex', 'start', { elapsedSeconds });
+  try {
+    let idx = 0;
+    ORDER_STEPS.forEach((step, i) => {
+      if (elapsedSeconds >= step.atSeconds) idx = i;
+    });
+    log.info('getActiveStepIndex', 'end', { idx });
+    return idx;
+  } catch (err) {
+    log.error('getActiveStepIndex', 'failed to compute active step index', { elapsedSeconds }, err);
+    throw err;
+  }
 }
 
 export function isOrderActive(placedAt: string, nowMs?: number): boolean {
-  return getActiveStepIndex(getElapsedSeconds(placedAt, nowMs)) < DELIVERED_INDEX;
+  log.info('isOrderActive', 'start', { placedAt, nowMs });
+  try {
+    const active = getActiveStepIndex(getElapsedSeconds(placedAt, nowMs)) < DELIVERED_INDEX;
+    log.info('isOrderActive', 'end', { active });
+    return active;
+  } catch (err) {
+    log.error('isOrderActive', 'failed to determine if order is active', { placedAt, nowMs }, err);
+    throw err;
+  }
 }
 
 // Maps order-service's real OrderStatusCode (see orderApi.ts) onto an
@@ -61,20 +80,36 @@ export function isOrderActive(placedAt: string, nowMs?: number): boolean {
 export function backendStatusToStepIndex(
   status: 'PENDING' | 'KITCHEN_ACCEPTED' | 'PREPARING' | 'READY' | 'DISPATCHED' | 'DELIVERED' | 'REJECTED',
 ): number {
-  switch (status) {
-    case 'PENDING':
-      return ORDER_STEPS.findIndex(s => s.key === 'placed');
-    case 'KITCHEN_ACCEPTED':
-      return ORDER_STEPS.findIndex(s => s.key === 'accepted');
-    case 'PREPARING':
-      return ORDER_STEPS.findIndex(s => s.key === 'preparing');
-    case 'READY':
-      return ORDER_STEPS.findIndex(s => s.key === 'ready');
-    case 'DISPATCHED':
-      return OUT_FOR_DELIVERY_INDEX;
-    case 'DELIVERED':
-      return DELIVERED_INDEX;
-    case 'REJECTED':
-      return -1;
+  log.info('backendStatusToStepIndex', 'start', { status });
+  try {
+    let idx: number;
+    switch (status) {
+      case 'PENDING':
+        idx = ORDER_STEPS.findIndex(s => s.key === 'placed');
+        break;
+      case 'KITCHEN_ACCEPTED':
+        idx = ORDER_STEPS.findIndex(s => s.key === 'accepted');
+        break;
+      case 'PREPARING':
+        idx = ORDER_STEPS.findIndex(s => s.key === 'preparing');
+        break;
+      case 'READY':
+        idx = ORDER_STEPS.findIndex(s => s.key === 'ready');
+        break;
+      case 'DISPATCHED':
+        idx = OUT_FOR_DELIVERY_INDEX;
+        break;
+      case 'DELIVERED':
+        idx = DELIVERED_INDEX;
+        break;
+      case 'REJECTED':
+        idx = -1;
+        break;
+    }
+    log.info('backendStatusToStepIndex', 'end', { status, idx });
+    return idx;
+  } catch (err) {
+    log.error('backendStatusToStepIndex', 'failed to map backend status to step index', { status }, err);
+    throw err;
   }
 }

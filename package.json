@@ -26,12 +26,13 @@
     "react-redux": "^9.3.0"
   },
   "devDependencies": {
+    "@react-native-community/cli": "latest",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3",
-    "@react-native-community/cli": "latest"
+    "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
+    "start:log": "expo start > D:/logs/frontend/gharkaswaad-mob-app/.logs 2>&1",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web"

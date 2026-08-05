@@ -1,4 +1,7 @@
 import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('src/services/couponApi.ts');
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,19 +38,28 @@ export const couponApi = createApi({
   endpoints: builder => ({
     validateCoupon: builder.mutation<ValidateCouponResult, ValidateCouponRequest>({
       async queryFn({ code, subtotal }) {
-        await new Promise(resolve => setTimeout(resolve, MOCK_LATENCY_MS));
+        log.info('validateCoupon', 'start', { code, subtotal });
+        try {
+          await new Promise(resolve => setTimeout(resolve, MOCK_LATENCY_MS));
 
-        const normalizedCode = code.trim().toUpperCase();
-        const discountPercent = HARDCODED_COUPONS[normalizedCode];
-        if (!normalizedCode || discountPercent === undefined) {
-          return { error: { status: 404, message: 'Invalid or expired coupon code.' } };
-        }
-        if (subtotal <= 0) {
-          return { error: { status: 422, message: 'Add items to your cart before applying a coupon.' } };
-        }
+          const normalizedCode = code.trim().toUpperCase();
+          const discountPercent = HARDCODED_COUPONS[normalizedCode];
+          if (!normalizedCode || discountPercent === undefined) {
+            log.info('validateCoupon', 'end (invalid code)', { code, normalizedCode });
+            return { error: { status: 404, message: 'Invalid or expired coupon code.' } };
+          }
+          if (subtotal <= 0) {
+            log.info('validateCoupon', 'end (empty subtotal)', { code, subtotal });
+            return { error: { status: 422, message: 'Add items to your cart before applying a coupon.' } };
+          }
 
-        const discount = Math.round(subtotal * (discountPercent / 100));
-        return { data: { code: normalizedCode, discount } };
+          const discount = Math.round(subtotal * (discountPercent / 100));
+          log.info('validateCoupon', 'end', { code: normalizedCode, discount });
+          return { data: { code: normalizedCode, discount } };
+        } catch (err) {
+          log.error('validateCoupon', 'unexpected error validating coupon', { code, subtotal }, err);
+          return { error: { status: 500, message: 'Unexpected error validating coupon.' } };
+        }
       },
     }),
   }),

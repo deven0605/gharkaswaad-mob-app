@@ -1,6 +1,9 @@
 import { Colors } from '../theme/colors';
 import { BriefcaseIcon, HouseIcon, MapPinIcon } from '../components/Icons';
 import { Address, AddressLabel } from '../services/customerApi';
+import { createLogger } from './logger';
+
+const log = createLogger('src/utils/addressLabels.ts');
 
 export const ADDRESS_LABEL_META: Record<AddressLabel, { Icon: typeof HouseIcon; iconColor: string; bg: string }> = {
   HOME: { Icon: HouseIcon, iconColor: Colors.primary, bg: '#FBE4D8' },
@@ -29,11 +32,19 @@ export function addressLabelDisplayName(label?: AddressLabel | string): string {
 export function formatAddress(
   address: Pick<Address, 'flatNo' | 'building' | 'street' | 'area' | 'landmark' | 'city' | 'pinCode'>,
 ): string {
-  const lineParts = [address.flatNo, address.building, address.street, address.area]
-    .map(s => (s ?? '').trim())
-    .filter(Boolean);
-  let line = lineParts.join(', ');
-  if (address.landmark?.trim()) line += ` (Near ${address.landmark.trim()})`;
-  const cityLine = [address.city?.trim(), address.pinCode?.trim()].filter(Boolean).join(' ');
-  return [line, cityLine].filter(Boolean).join(', ');
+  log.info('formatAddress', 'start', { address });
+  try {
+    const lineParts = [address.flatNo, address.building, address.street, address.area]
+      .map(s => (s ?? '').trim())
+      .filter(Boolean);
+    let line = lineParts.join(', ');
+    if (address.landmark?.trim()) line += ` (Near ${address.landmark.trim()})`;
+    const cityLine = [address.city?.trim(), address.pinCode?.trim()].filter(Boolean).join(' ');
+    const formatted = [line, cityLine].filter(Boolean).join(', ');
+    log.info('formatAddress', 'end', { formatted });
+    return formatted;
+  } catch (err) {
+    log.error('formatAddress', 'failed to format address', { address }, err);
+    throw err;
+  }
 }

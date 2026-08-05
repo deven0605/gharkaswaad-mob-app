@@ -1,5 +1,8 @@
 import { OrderRecord } from '../store/ordersSlice';
 import { ORDER_STEPS, DELIVERED_INDEX, getElapsedSeconds } from './orderStatus';
+import { createLogger } from './logger';
+
+const log = createLogger('src/utils/notifications.ts');
 
 export type NotificationKind = 'delivered' | 'outForDelivery' | 'kitchenAccepted' | 'coupon' | 'rate';
 
@@ -28,6 +31,8 @@ function etaMaxMinutes(etaText: string): number {
 // plus the local coupon registry, instead of hardcoding a static list — so it
 // naturally grows as orders progress within the session.
 export function deriveNotifications(orders: OrderRecord[], now: number = Date.now()): NotificationItem[] {
+  log.info('deriveNotifications', 'start', { orderCount: orders.length, now });
+  try {
   const items: NotificationItem[] = [];
 
   orders.forEach(order => {
@@ -70,5 +75,11 @@ export function deriveNotifications(orders: OrderRecord[], now: number = Date.no
     kind: 'coupon',
   });
 
-  return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  const sorted = items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  log.info('deriveNotifications', 'end', { itemCount: sorted.length });
+  return sorted;
+  } catch (err) {
+    log.error('deriveNotifications', 'failed to derive notifications', { orderCount: orders.length }, err);
+    throw err;
+  }
 }
